@@ -72,6 +72,8 @@
 #define USE_TELEMETRY_LTM
 #define USE_TELEMETRY_FRSKY
 
+#define USE_MSP_DISPLAYPORT
+
 #if defined(STM_FAST_TARGET)
 #define SCHEDULER_DELAY_LIMIT           10
 #else
@@ -187,7 +189,6 @@
 #define USE_TELEMETRY_IBUS
 #define USE_TELEMETRY_SMARTPORT
 #define USE_TELEMETRY_CRSF
-#define USE_TELEMETRY_JETIEXBUS
 // These are rather exotic serial protocols
 #define USE_RX_MSP
 //#define USE_MSP_RC_OVERRIDE

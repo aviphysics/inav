@@ -38,7 +38,7 @@
 #include "msp/msp_serial.h"
 
 static mspPort_t mspPorts[MAX_MSP_PORT_COUNT];
-
+uint8_t msp_displayport_locked = 0;
 
 void resetMspPort(mspPort_t *mspPortToReset, serialPort_t *serialPort)
 {
@@ -46,6 +46,32 @@ void resetMspPort(mspPort_t *mspPortToReset, serialPort_t *serialPort)
 
     mspPortToReset->port = serialPort;
 }
+
+#if defined(USE_MSP_DISPLAYPORT)
+void mspDisplayportAllocatePorts(void)
+{
+    uint8_t portIndex = 0;
+    serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_MSP_DISPLAYPORT);
+
+    while (portConfig && portIndex < MAX_MSP_PORT_COUNT) {
+        mspPort_t *mspPort = &mspPorts[portIndex];
+        if (mspPort->port) {
+            portIndex++;
+            continue;
+        }
+
+        serialPort_t *serialPort = openSerialPort(portConfig->identifier, FUNCTION_MSP_DISPLAYPORT, NULL, NULL, baudRates[portConfig->msp_baudrateIndex], MODE_RXTX, SERIAL_NOT_INVERTED);
+        msp_displayport_locked |= (1 << (portConfig->identifier));
+
+        if (serialPort) {
+            resetMspPort(mspPort, serialPort);
+            portIndex++;
+        }
+
+        portConfig = findNextSerialPortConfig(FUNCTION_MSP_DISPLAYPORT);
+    }
+}
+#endif
 
 void mspSerialAllocatePorts(void)
 {
@@ -509,8 +535,12 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
 
 void mspSerialInit(void)
 {
+    msp_displayport_locked = 0;
     memset(mspPorts, 0, sizeof(mspPorts));
     mspSerialAllocatePorts();
+#if defined(USE_MSP_DISPLAYPORT)
+    mspDisplayportAllocatePorts();
+#endif
 }
 
 int mspSerialPushPort(uint16_t cmd, const uint8_t *data, int datalen, mspPort_t *mspPort, mspVersion_e version)
@@ -542,6 +572,11 @@ int mspSerialPush(uint8_t cmd, const uint8_t *data, int datalen)
 
         // Avoid unconnected ports (only VCP for now)
         if (!serialIsConnected(mspPort->port)) {
+            continue;
+        }
+
+        // only enable for msp_displayport
+        if ((msp_displayport_locked & (1 << mspPort->port->identifier)) == 0) {
             continue;
         }
 

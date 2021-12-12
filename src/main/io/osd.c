@@ -114,6 +114,8 @@ FILE_COMPILE_FOR_SPEED
 #include "hardware_revision.h"
 #endif
 
+#include "msp/msp_serial.h"
+
 #define VIDEO_BUFFER_CHARS_PAL    480
 
 #define GFORCE_FILTER_TC 0.2
@@ -2893,6 +2895,18 @@ static uint8_t osdIncElementIndex(uint8_t elementIndex)
     return elementIndex;
 }
 
+void osdDrawAllElement(void)
+{
+    static uint8_t elementIndex = 0;
+    
+    for(elementIndex=0; elementIndex<OSD_ITEM_COUNT; elementIndex++) {
+        osdDrawSingleElement(elementIndex);
+    }
+
+    // Draw artificial horizon last
+    osdDrawSingleElement(OSD_ARTIFICIAL_HORIZON);
+}
+
 void osdDrawNextElement(void)
 {
     static uint8_t elementIndex = 0;
@@ -3679,13 +3693,22 @@ static void osdRefresh(timeUs_t currentTimeUs)
 #ifdef USE_CMS
     if (!displayIsGrabbed(osdDisplayPort)) {
         displayBeginTransaction(osdDisplayPort, DISPLAY_TRANSACTION_OPT_RESET_DRAWING);
-        if (fullRedraw) {
-            displayClearScreen(osdDisplayPort);
-            fullRedraw = false;
+        if (!msp_displayport_locked) {
+            if (fullRedraw) {
+                displayClearScreen(osdDisplayPort);
+                fullRedraw = false;
+            }
+            osdDrawNextElement();
         }
-        osdDrawNextElement();
+#ifdef USE_MSP_DISPLAYPORT
+        else {
+            displayClearScreen(osdDisplayPort);
+            osdDrawAllElement();
+        }
+#endif
         displayHeartbeat(osdDisplayPort);
         displayCommitTransaction(osdDisplayPort);
+
 #ifdef OSD_CALLS_CMS
     } else {
         cmsUpdate(currentTimeUs);
@@ -3699,6 +3722,7 @@ static void osdRefresh(timeUs_t currentTimeUs)
  */
 void osdUpdate(timeUs_t currentTimeUs)
 {
+    static uint8_t factor = 1;
     static uint32_t counter = 0;
 
     // don't touch buffers if DMA transaction is in progress
@@ -3760,10 +3784,14 @@ void osdUpdate(timeUs_t currentTimeUs)
         osdUpdateStats();
     }
 
-    if ((counter & DRAW_FREQ_DENOM) == 0) {
+    if (msp_displayport_locked)
+        factor = 6;
+    else
+        factor = 1;
+
+    if ((counter % (DRAW_FREQ_DENOM * factor)) == 0) {
         // redraw values in buffer
         osdRefresh(currentTimeUs);
-    } else {
         // rest of time redraw screen
         displayDrawScreen(osdDisplayPort);
     }

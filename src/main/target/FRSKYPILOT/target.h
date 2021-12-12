@@ -29,6 +29,7 @@
 
 #define BEEPER                  PA0
 #define BEEPER_INVERTED
+#define BEEPER_PWM
 #define BEEPER_PWM_FREQUENCY    4000
 
 #define USE_SPI

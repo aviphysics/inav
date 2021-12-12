@@ -125,11 +125,7 @@ STATIC_FASTRAM bool pidGainsUpdateRequired;
 FASTRAM int16_t axisPID[FLIGHT_DYNAMICS_INDEX_COUNT];
 
 #ifdef USE_BLACKBOX
-int32_t axisPID_P[FLIGHT_DYNAMICS_INDEX_COUNT];
-int32_t axisPID_I[FLIGHT_DYNAMICS_INDEX_COUNT];
-int32_t axisPID_D[FLIGHT_DYNAMICS_INDEX_COUNT];
-int32_t axisPID_F[FLIGHT_DYNAMICS_INDEX_COUNT];
-int32_t axisPID_Setpoint[FLIGHT_DYNAMICS_INDEX_COUNT];
+int32_t axisPID_P[FLIGHT_DYNAMICS_INDEX_COUNT], axisPID_I[FLIGHT_DYNAMICS_INDEX_COUNT], axisPID_D[FLIGHT_DYNAMICS_INDEX_COUNT], axisPID_Setpoint[FLIGHT_DYNAMICS_INDEX_COUNT];
 #endif
 
 static EXTENDED_FASTRAM pidState_t pidState[FLIGHT_DYNAMICS_INDEX_COUNT];
@@ -770,6 +766,7 @@ static void NOINLINE pidApplyFixedWingRateController(pidState_t *pidState, fligh
     const float newDTerm = dTermProcess(pidState, dT);
     const float newFFTerm = pidState->rateTarget * pidState->kFF;
 
+    DEBUG_SET(DEBUG_FW_D, axis, newDTerm);
     /*
      * Integral should be updated only if axis Iterm is not frozen
      */
@@ -795,7 +792,6 @@ static void NOINLINE pidApplyFixedWingRateController(pidState_t *pidState, fligh
     axisPID_P[axis] = newPTerm;
     axisPID_I[axis] = pidState->errorGyroIf;
     axisPID_D[axis] = newDTerm;
-    axisPID_F[axis] = newFFTerm;
     axisPID_Setpoint[axis] = pidState->rateTarget;
 #endif
 
@@ -830,8 +826,15 @@ static void FAST_CODE NOINLINE pidApplyMulticopterRateController(pidState_t *pid
 
     /*
      * Compute Control Derivative
+     * CD is enabled only when ANGLE and HORIZON modes are not enabled!
      */
-    const float newCDTerm = rateTargetDeltaFiltered * (pidState->kCD / dT);
+    float newCDTerm;
+    if (levelingEnabled) {
+        newCDTerm = 0.0F;
+    } else {
+        newCDTerm = rateTargetDeltaFiltered * (pidState->kCD / dT);
+    }
+    DEBUG_SET(DEBUG_CD, axis, newCDTerm);
 
     // TODO: Get feedback from mixer on available correction range for each axis
     const float newOutput = newPTerm + newDTerm + pidState->errorGyroIf + newCDTerm;
@@ -855,7 +858,6 @@ static void FAST_CODE NOINLINE pidApplyMulticopterRateController(pidState_t *pid
     axisPID_P[axis] = newPTerm;
     axisPID_I[axis] = pidState->errorGyroIf;
     axisPID_D[axis] = newDTerm;
-    axisPID_F[axis] = newCDTerm;
     axisPID_Setpoint[axis] = pidState->rateTarget;
 #endif
 
