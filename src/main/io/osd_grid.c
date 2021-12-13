@@ -43,6 +43,8 @@
 
 #include "navigation/navigation.h"
 
+#include "msp/msp_serial.h"
+
 typedef enum {
     OSD_SIDEBAR_ARROW_NONE,
     OSD_SIDEBAR_ARROW_UP,
@@ -117,6 +119,9 @@ void osdGridDrawArtificialHorizon(displayPort_t *display, unsigned gx, unsigned 
     uint8_t elemPosX;
     uint8_t elemPosY;
 
+    if (!msp_displayport_locked)
+        return;
+    
     osdCrosshairPosition(&elemPosX, &elemPosY);
 
     // Store the positions we draw over to erase only these at the next iteration
